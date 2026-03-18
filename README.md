@@ -102,6 +102,52 @@ Once the container is running, you can:
 - Tail logs: `docker logs -f gptoss-server`
 - Hit the health/model list endpoint: `curl http://localhost:${PORT}/v1/models`
 
+#### Verify the model is loaded on GPUs (nvidia-smi)
+
+If you want a quick sanity check that the model weights are resident on the GPUs, run:
+
+```bash
+watch -n 0.1 nvidia-smi
+```
+
+Example output (2-way tensor parallel, 2 GPUs):
+
+```text
+Every 0.1s: nvidia-smi                                                                                                   ubuntu-gpu: Wed Mar 18 08:33:44 2026
+
+Wed Mar 18 08:33:44 2026
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.105.08             Driver Version: 580.105.08     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX PRO 4000 Blac...    Off |   00000000:01:00.0 Off |                  Off |
+| 30%   34C    P8              7W /  145W |   22329MiB /  24467MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX PRO 4000 Blac...    Off |   00000000:02:00.0 Off |                  Off |
+| 30%   32C    P8              6W /  145W |   22329MiB /  24467MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A         2748316      C   VLLM::Worker_TP0                      22320MiB |
+|    1   N/A  N/A         2748317      C   VLLM::Worker_TP1                      22320MiB |
++-----------------------------------------------------------------------------------------+
+```
+
+How to interpret this:
+
+- **High, steady GPU memory usage with `VLLM::Worker_TP*` processes** means the model is loaded and each tensor-parallel worker is holding its shard in GPU memory.
+- **Low GPU-Util (e.g. 0%) while memory stays high** is normal when the server is idle; utilization spikes only while requests are running.
+- If you don’t see any `VLLM::Worker_*` processes, the container may not be running or may have failed to start (check `docker logs -f gptoss-server`).
+
 ---
 
 ### 3. Run benchmarks with `aiperf`
