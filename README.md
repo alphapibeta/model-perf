@@ -193,6 +193,9 @@ python3 bench_report.py --suite concurrency --plot
 # Generate plots for a specific benchmark timestamp
 # (writes under benchmarks/<model-ts>/_plots)
 python3 bench_report.py --model-ts gpt-oss-20b_20260318_064711 --suite concurrency --plot
+
+# Parse per-request JSONL (slower) and write a Markdown report next to the plots
+python3 bench_report.py --model-ts gpt-oss-20b_20260318_071231 --suite concurrency --per-request --report
 ```
 
 Plotting requires `matplotlib`:
@@ -219,6 +222,16 @@ What it shows (per run):
     - `vllm:request_prefill_time_seconds` (p95)
     - `vllm:request_decode_time_seconds` (p95)
     - `vllm:e2e_request_latency_seconds` (p95)
+
+Optional deep-dive (raw per-request tails):
+
+- `--per-request` parses `aiperf_artifacts/profile_export.jsonl` to compute **p99/max** tails for TTFT / request latency / HTTP waiting and an **OSL mismatch rate**.
+- `--report` writes a short Markdown report to the plot directory (e.g. `benchmarks/<model-ts>/_plots/report.md`) describing what “better” means and highlighting saturation.
+
+Interpreting the derived queueing metrics:
+
+- **`little_L`**: \(L \approx \lambda \cdot W\) (Little’s Law estimate), where \(\lambda\) is `rps` and \(W\) is avg request latency in seconds. Bigger usually means more “in-system work” (often queueing) as you saturate.
+- **`q_pressure`**: `waiting_avg / concurrency` (rough queue pressure). Bigger means a larger fraction of offered load is waiting rather than running.
 
 At the end it prints a high-level summary and reminds you to focus on:
 
