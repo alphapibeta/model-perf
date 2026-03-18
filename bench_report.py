@@ -807,6 +807,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     p.add_argument("--plot", action="store_true", help="Generate plots (requires matplotlib)")
     p.add_argument(
+        "--by-suite",
+        action="store_true",
+        help=(
+            "When used with --plot/--report, also generate per-suite outputs under "
+            "<plot-out>/<suite>/ (and a combined set under <plot-out>/all/)."
+        ),
+    )
+    p.add_argument(
         "--plot-out",
         default=None,
         help=(
@@ -878,13 +886,38 @@ def main(argv: Optional[List[str]] = None) -> int:
                 plot_out = str(Path(args.benchmarks_dir) / args.model_ts / "_plots")
             else:
                 plot_out = str(Path(args.benchmarks_dir) / "_plots")
-        plot_runs(runs, Path(plot_out))
+        base_out = Path(plot_out)
+        if args.by_suite:
+            # Combined overlay in all/
+            plot_runs(runs, base_out / "all")
+            # Individual suite plots
+            suites_present = sorted({r.rid.suite for r in runs if r.rid.suite != "unknown"})
+            for s in suites_present:
+                plot_runs([r for r in runs if r.rid.suite == s], base_out / s)
+        else:
+            plot_runs(runs, base_out)
 
     if args.report:
         out_dir = Path(args.plot_out) if args.plot_out else _default_plot_out(args.benchmarks_dir, args.model_ts)
-        report_path = out_dir / str(args.report_name)
-        title = f"Benchmark report ({args.model_ts or 'all runs'})"
-        write_markdown_report(runs, report_path, title=title, include_per_request=bool(args.per_request))
+        if args.by_suite:
+            write_markdown_report(
+                runs,
+                out_dir / "all" / str(args.report_name),
+                title=f"Benchmark report ({args.model_ts or 'all runs'} / all)",
+                include_per_request=bool(args.per_request),
+            )
+            suites_present = sorted({r.rid.suite for r in runs if r.rid.suite != "unknown"})
+            for s in suites_present:
+                write_markdown_report(
+                    [r for r in runs if r.rid.suite == s],
+                    out_dir / s / str(args.report_name),
+                    title=f"Benchmark report ({args.model_ts or 'all runs'} / {s})",
+                    include_per_request=bool(args.per_request),
+                )
+        else:
+            report_path = out_dir / str(args.report_name)
+            title = f"Benchmark report ({args.model_ts or 'all runs'})"
+            write_markdown_report(runs, report_path, title=title, include_per_request=bool(args.per_request))
 
     return 0
 

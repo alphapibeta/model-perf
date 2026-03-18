@@ -1,4 +1,4 @@
-## Benchmark report (gpt-oss-20b_20260318_071231)
+## Benchmark report (gpt-oss-20b_20260318_131341 / all)
 
 ### Metric directions (how to read ‘better’)
 
@@ -8,9 +8,9 @@
 
 ### Highlights
 
-- **Best latency (TTFT p95)**: `concurrency_c1_req20_in512_out160` (c=1) → 122.10 ms
-- **Best throughput (out_tps)**: `concurrency_c6_req20_in512_out160` (c=6) → 152.60 tok/s
-- **Saturation knee (heuristic)**: around c=6 (`concurrency_c6_req20_in512_out160`) where TTFT p95 jumps ≥2× vs previous concurrency.
+- **Best latency (TTFT p95)**: `concurrency_c1_req128_in512_out160` (c=1) → 134.31 ms
+- **Best throughput (out_tps)**: `concurrency_c128_req128_in512_out160` (c=128) → 1752.82 tok/s
+- **Saturation knee (heuristic)**: around c=16 (`concurrency_c16_req128_in512_out160`) where TTFT p95 jumps ≥2× vs previous concurrency.
 
 ### Queueing interpretation
 

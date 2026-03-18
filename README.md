@@ -148,6 +148,10 @@ How to interpret this:
 - **Low GPU-Util (e.g. 0%) while memory stays high** is normal when the server is idle; utilization spikes only while requests are running.
 - If you don’t see any `VLLM::Worker_*` processes, the container may not be running or may have failed to start (check `docker logs -f gptoss-server`).
 
+Optional: if you have node-level monitoring (e.g. Grafana), a dashboard like the one below helps correlate **GPU memory**, **GPU power**, **GPU temperature**, and **CPU usage** during benchmark runs:
+
+![Example monitoring dashboard (GPU/CPU metrics)](SCR-20260318-fpuj.png)
+
 ---
 
 ### 3. Run benchmarks with `aiperf`
@@ -242,6 +246,14 @@ python3 bench_report.py --model-ts gpt-oss-20b_20260318_064711 --suite concurren
 
 # Parse per-request JSONL (slower) and write a Markdown report next to the plots
 python3 bench_report.py --model-ts gpt-oss-20b_20260318_071231 --suite concurrency --per-request --report
+
+# Generate plots/reports for each suite (concurrency/longctx/stress) AND a combined overlay set.
+# Output goes to:
+#   benchmarks/<model-ts>/_plots/all/
+#   benchmarks/<model-ts>/_plots/concurrency/
+#   benchmarks/<model-ts>/_plots/longctx/
+#   benchmarks/<model-ts>/_plots/stress/
+python3 bench_report.py --model-ts gpt-oss-20b_20260318_083838 --per-request --plot --report --by-suite
 ```
 
 Plotting requires `matplotlib`:
@@ -387,6 +399,12 @@ This section explains the main knobs you care about and how they affect **memory
 
 These live in the env files and are consumed by `benchmark.sh`.
 
+- **Streaming**
+  - `STREAMING` controls whether `aiperf` runs with `--streaming`.
+  - You can override per suite:
+    - `STREAMING_BASELINE`, `STREAMING_CONCURRENCY`, `STREAMING_LONGCTX`, `STREAMING_STRESS`
+  - **Tip**: for very large outputs (e.g. longctx), disabling streaming can avoid client-side chunk parsing issues.
+
 - **Request counts**
   - `REQUEST_COUNT_BASELINE`, `REQUEST_COUNT_CONCURRENCY`, `REQUEST_COUNT_LONGCTX`, `REQUEST_COUNT_STRESS`
   - **What they control**: How many **total requests** each suite sends.
@@ -397,7 +415,7 @@ These live in the env files and are consumed by `benchmark.sh`.
     - `benchmark.sh` will automatically **bump** the per-run request count if needed (and the run directory name will reflect the effective `req...`).
 
 - **Concurrency levels**
-  - `CONCURRENCY_LEVELS`, `STRESS_CONCURRENCY_LEVELS`
+  - `CONCURRENCY_LEVELS`, `STRESS_CONCURRENCY_LEVELS`, `LONGCTX_CONCURRENCY_LEVELS`
   - **What they control**: How many **in-flight requests** `aiperf` will maintain.
   - **Effect**:
     - Higher concurrency exposes **throughput limits** and queueing behavior.
@@ -405,6 +423,18 @@ These live in the env files and are consumed by `benchmark.sh`.
   - **Guidance**:
     - Use lower concurrency levels for baselines (`1–4`).
     - Use higher levels for stress to see how the system behaves near saturation.
+  - **Examples**:
+
+```bash
+# Concurrency sweep (typical throughput/latency curve)
+CONCURRENCY_LEVELS="1 2 4 6 16 32 64 128"
+
+# Stress sweep (push well past saturation; watch TTFT explode)
+STRESS_CONCURRENCY_LEVELS="32 64 128"
+
+# Long-context sweep (often keep lower, but you can test 1/2/4/etc.)
+LONGCTX_CONCURRENCY_LEVELS="1 2 4"
+```
 
 - **Token sizes**
   - `INPUT_TOKENS_BASELINE`, `OUTPUT_TOKENS_BASELINE`
@@ -459,4 +489,16 @@ This README should give you a clear path from zero to:
 1. Running a vLLM server for `openai/gpt-oss-20b`.
 2. Hitting it via an OpenAI-compatible API.
 3. Benchmarking it with `aiperf` and analyzing latency/throughput.
+
+---
+
+### Troubleshooting
+
+- **`orjson.JSONDecodeError: unexpected end of data` during long runs**
+  - This can happen when running `aiperf` with `--streaming` and very large outputs (e.g. long-context suite), where the client ends up with an incomplete chunk to parse.
+  - **Workaround**: disable streaming just for longctx by setting in your env file:
+
+```bash
+STREAMING_LONGCTX=false
+```
 

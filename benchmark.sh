@@ -28,6 +28,10 @@ URL="${URL:-http://${HOST_FOR_URL}:${PORT}}"
 TOKENIZER="${TOKENIZER:-openai/gpt-oss-20b}"
 ENDPOINT_TYPE="${ENDPOINT_TYPE:-chat}"
 STREAMING="${STREAMING:-true}"
+STREAMING_BASELINE="${STREAMING_BASELINE:-$STREAMING}"
+STREAMING_CONCURRENCY="${STREAMING_CONCURRENCY:-$STREAMING}"
+STREAMING_LONGCTX="${STREAMING_LONGCTX:-$STREAMING}"
+STREAMING_STRESS="${STREAMING_STRESS:-$STREAMING}"
 
 REQUEST_COUNT_BASELINE="${REQUEST_COUNT_BASELINE:-10}"
 REQUEST_COUNT_CONCURRENCY="${REQUEST_COUNT_CONCURRENCY:-20}"
@@ -36,6 +40,7 @@ REQUEST_COUNT_STRESS="${REQUEST_COUNT_STRESS:-30}"
 
 CONCURRENCY_LEVELS=(${CONCURRENCY_LEVELS:-1 2 4})
 STRESS_CONCURRENCY_LEVELS=(${STRESS_CONCURRENCY_LEVELS:-2 4 6})
+LONGCTX_CONCURRENCY_LEVELS=(${LONGCTX_CONCURRENCY_LEVELS:-1 2})
 
 INPUT_TOKENS_BASELINE="${INPUT_TOKENS_BASELINE:-256}"
 OUTPUT_TOKENS_BASELINE="${OUTPUT_TOKENS_BASELINE:-128}"
@@ -92,6 +97,7 @@ run_aiperf() {
   local request_count="$3"
   local input_tokens="$4"
   local output_tokens="$5"
+  local streaming_override="${6:-}"
 
   # AIPerf requires: concurrency <= request_count.
   # If the env requests an invalid combo (e.g., c32 with req20), bump request_count
@@ -128,7 +134,12 @@ run_aiperf() {
     --artifact-dir "${run_dir}/aiperf_artifacts"
   )
 
-  if [[ "${STREAMING}" == "true" ]]; then
+  local use_streaming="${STREAMING}"
+  if [[ -n "${streaming_override}" ]]; then
+    use_streaming="${streaming_override}"
+  fi
+
+  if [[ "${use_streaming}" == "true" ]]; then
     cmd+=(--streaming)
   fi
 
@@ -149,24 +160,24 @@ run_aiperf() {
 }
 
 baseline_suite() {
-  run_aiperf "baseline" "1" "${REQUEST_COUNT_BASELINE}" "${INPUT_TOKENS_BASELINE}" "${OUTPUT_TOKENS_BASELINE}"
+  run_aiperf "baseline" "1" "${REQUEST_COUNT_BASELINE}" "${INPUT_TOKENS_BASELINE}" "${OUTPUT_TOKENS_BASELINE}" "${STREAMING_BASELINE}"
 }
 
 concurrency_suite() {
   for c in "${CONCURRENCY_LEVELS[@]}"; do
-    run_aiperf "concurrency" "${c}" "${REQUEST_COUNT_CONCURRENCY}" "${INPUT_TOKENS_CONCURRENCY}" "${OUTPUT_TOKENS_CONCURRENCY}"
+    run_aiperf "concurrency" "${c}" "${REQUEST_COUNT_CONCURRENCY}" "${INPUT_TOKENS_CONCURRENCY}" "${OUTPUT_TOKENS_CONCURRENCY}" "${STREAMING_CONCURRENCY}"
   done
 }
 
 long_context_suite() {
-  for c in 1 2; do
-    run_aiperf "longctx" "${c}" "${REQUEST_COUNT_LONGCTX}" "${INPUT_TOKENS_LONGCTX}" "${OUTPUT_TOKENS_LONGCTX}"
+  for c in "${LONGCTX_CONCURRENCY_LEVELS[@]}"; do
+    run_aiperf "longctx" "${c}" "${REQUEST_COUNT_LONGCTX}" "${INPUT_TOKENS_LONGCTX}" "${OUTPUT_TOKENS_LONGCTX}" "${STREAMING_LONGCTX}"
   done
 }
 
 stress_suite() {
   for c in "${STRESS_CONCURRENCY_LEVELS[@]}"; do
-    run_aiperf "stress" "${c}" "${REQUEST_COUNT_STRESS}" "${INPUT_TOKENS_STRESS}" "${OUTPUT_TOKENS_STRESS}"
+    run_aiperf "stress" "${c}" "${REQUEST_COUNT_STRESS}" "${INPUT_TOKENS_STRESS}" "${OUTPUT_TOKENS_STRESS}" "${STREAMING_STRESS}"
   done
 }
 
