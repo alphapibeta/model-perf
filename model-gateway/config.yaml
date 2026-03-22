@@ -1,0 +1,37 @@
+model_list:
+  - model_name: local-oss-20b
+    litellm_params:
+      model: openai/gpt-oss-20b
+      api_base: http://192.168.1.33:30000/v1
+      api_key: "dummy"
+    model_info:
+      supports_function_calling: true
+      supports_tool_choice: true
+
+  - model_name: nvidia-llama3.1-70b
+    litellm_params:
+      model: nvidia_nim/meta/llama-3.1-70b-instruct
+      api_key: os.environ/NVIDIA_API_KEY
+
+  - model_name: nvidia-llama3.1-405b
+    litellm_params:
+      model: nvidia_nim/meta/llama-3.1-405b-instruct
+      api_key: os.environ/NVIDIA_API_KEY
+
+# Pass-through route: bypasses LiteLLM response parsing entirely
+pass_through_endpoints:
+  - path: "/local/chat/completions"
+    target: "http://192.168.1.33:30000/v1/chat/completions"
+    headers:
+      content-type: "application/json"
+
+mcp_servers:
+  kite:
+    url: "http://localhost:8080/mcp"
+    transport: "http"
+
+litellm_settings:
+  success_callback: ["langfuse_otel"]
+  failure_callback: ["langfuse_otel"]
+  num_retries: 2
+  request_timeout: 300
