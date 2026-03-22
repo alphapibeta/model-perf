@@ -9,7 +9,6 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-# Prefer token from shell over env file
 HF_TOKEN_FROM_SHELL="${HF_TOKEN:-}"
 
 set -a
@@ -24,7 +23,6 @@ if [[ -z "$HF_TOKEN_VALUE" ]]; then
   exit 1
 fi
 
-# Defaults
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-30000}"
 CONTAINER_NAME="${CONTAINER_NAME:-sglang-gptoss-server}"
@@ -34,6 +32,10 @@ SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-$MODEL_PATH}"
 
 CUDA_DEVICES="${CUDA_DEVICES:-0}"
 TP_SIZE="${TP_SIZE:-1}"
+
+REASONING_PARSER="${REASONING_PARSER:-gpt-oss}"
+TOOL_CALL_PARSER="${TOOL_CALL_PARSER:-gpt-oss}"
+TOOL_SERVER="${TOOL_SERVER:-}"
 
 MEM_FRACTION_STATIC="${MEM_FRACTION_STATIC:-0.85}"
 CHUNKED_PREFILL_SIZE="${CHUNKED_PREFILL_SIZE:-2048}"
@@ -64,16 +66,11 @@ DISABLE_CUDA_GRAPH="${DISABLE_CUDA_GRAPH:-0}"
 SKIP_SERVER_WARMUP="${SKIP_SERVER_WARMUP:-0}"
 
 FP4_GEMM_BACKEND="${FP4_GEMM_BACKEND:-flashinfer_cutlass}"
+
 mkdir -p "$HF_CACHE_HOST_PATH"
 
 echo "[INFO] Removing old container..."
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-
-
-
-
-
-
 
 CMD=(
   docker run -d
@@ -96,6 +93,8 @@ CMD=(
   --host "$HOST"
   --port "$PORT"
   --served-model-name "$SERVED_MODEL_NAME"
+  --reasoning-parser "$REASONING_PARSER"
+  --tool-call-parser "$TOOL_CALL_PARSER"
   --tensor-parallel-size "$TP_SIZE"
   --mem-fraction-static "$MEM_FRACTION_STATIC"
   --chunked-prefill-size "$CHUNKED_PREFILL_SIZE"
@@ -109,6 +108,10 @@ CMD=(
   --num-continuous-decode-steps "$NUM_CONTINUOUS_DECODE_STEPS"
 )
 
+if [[ -n "${TOOL_SERVER}" ]]; then
+  CMD+=(--tool-server "$TOOL_SERVER")
+fi
+
 if [[ -n "${MOE_RUNNER_BACKEND}" ]]; then
   CMD+=(--moe-runner-backend "$MOE_RUNNER_BACKEND")
 fi
@@ -116,7 +119,6 @@ fi
 if [[ -n "${FP4_GEMM_BACKEND}" ]]; then
   CMD+=(--fp4-gemm-backend "$FP4_GEMM_BACKEND")
 fi
-
 
 if [[ "${ENABLE_MIXED_CHUNK}" == "1" ]]; then
   CMD+=(--enable-mixed-chunk)
